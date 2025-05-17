@@ -1,1 +1,214 @@
-{"name": "My workflow 10", "nodes": []}
+{
+  "name": "My workflow 10",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "http://api.weatherapi.com/v1/current.json?key= 98adae444b4947a3a4e91950250905&q=avignon 84000&aqi=no",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -520,
+        -160
+      ],
+      "id": "521efe0c-df8c-4d02-8117-3a38ecc58330",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const temp = $json.current.temp_c;\nconst rh = $json.current.humidity;\nconst pressure = $json.current.pressure_mb;\nconst dewPoint = $json.current.dewpoint_c;\n\n// Constantes\nconst Rd = 287.05;\nconst Rv = 461.5;\nconst Lv = 2.5e6;\nconst Cp = 1005;\nconst epsilon = Rd / Rv;\n\n// Formule de Tetens\nconst es = 6.112 * Math.exp((17.67 * temp) / (temp + 243.5));\nconst e = rh / 100 * es;\n\n// Rapport de mélange (g/kg)\nconst r = (622 * e) / (pressure - e);\n\n// θe (approx. Hennig)\nconst temp_K = temp + 273.15;\nconst theta = temp_K * Math.pow(1000 / pressure, Rd / Cp);\nconst theta_e = theta * Math.exp((Lv * r / 1000) / (Cp * temp_K));\n\n// LCL (formule FAA)\nconst lcl_m = (temp - dewPoint) * 125;\n\nreturn [\n  {\n    json: {\n      ...$json,\n      r: Math.round(r * 10) / 10,\n      theta_e: Math.round(theta_e),\n      lcl_m: Math.round(lcl_m)\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -300,
+        -160
+      ],
+      "id": "c86db4e8-6c5b-452c-86c4-0909ed24a391",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = {\n  ville: $json.location.name,\n  heure_locale: $json.location.localtime,\n  temperature: $json.current.temp_c,\n  pression: $json.current.pressure_mb,\n  humidite: $json.current.humidity,\n  point_de_rosee: $json.current.dewpoint_c,\n  rapport_melange_gkg: $json.r,\n  theta_e_K: $json.theta_e,\n  lcl_m: $json.lcl_m\n};\n\nreturn [{ json: output }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        -160
+      ],
+      "id": "94840390-bb49-4c3e-99ec-c242b9ae57e5",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4-1106-preview",
+          "mode": "list",
+          "cachedResultName": "GPT-4-1106-PREVIEW"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Voici des données météorologiques pour la ville de {{ $json.ville }} à {{ $json.heure_locale }} :\n\n- Température : {{ $json.temperature }} °C\n- Humidité relative : {{ $json.humidite }} %\n- Pression atmosphérique : {{ $json.pression }} hPa\n- Point de rosée : {{ $json.point_de_rosee }} °C\n- Rapport de mélange : {{ $json.rapport_melange_gkg }} g/kg\n- Température potentielle équivalente : {{ $json.theta_e_K }} K\n- LCL (hauteur de base des cumulus) : {{ $json.lcl_m }} m\n\nObservation locale complémentaire : vent calme, stratocumulus stratiformis épars.\n\nPeux-tu analyser ces données en évaluant :\n- Le potentiel convectif\n- La stabilité atmosphérique\n- La présence possible d'une inversion\n- La cohérence avec l'observation (stratocumulus)\n- Une tendance possible à court terme\n\nUtilise un ton clair, rigoureux, complice et légèrement narratif (style Lyra). Résume en 5-7 phrases."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        140,
+        -160
+      ],
+      "id": "4b47956a-4717-4f3f-8f12-e87ec61edcd1",
+      "name": "OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "Usdl576VKQRGJfjf",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a6a6f608-0de5-4f75-a95b-d2fcf8b84dd8",
+              "name": "message.content",
+              "value": "={{ $json.message.content }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        -160
+      ],
+      "id": "2760b3e6-d571-4127-ab31-980e43318093",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "sendTo": "jerome.frasson84@gmail.com",
+        "subject": "Météo du jour par Lyra",
+        "message": "={{ $json.message.content }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        720,
+        -160
+      ],
+      "id": "e8b0c995-d86c-442d-ae6d-cab2b06c7c94",
+      "name": "Gmail",
+      "webhookId": "d6f7dc43-87b1-4933-be97-f28d5df410eb",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "kItbLOMBSUDhpsef",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -740,
+        -160
+      ],
+      "id": "ec72346c-84a4-4df7-818f-c9c90edfa5e9",
+      "name": "When clicking ‘Test workflow 10’"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Test workflow 10’": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ab65aa1c-df83-46bb-b002-d2961f12fc78",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "433137eccf40788d51aeaa302d84f603550f3edd3d459f6e5ab32515acc034c2"
+  },
+  "id": "zeBHi0QeTM6XLcvZ",
+  "tags": []
+}
