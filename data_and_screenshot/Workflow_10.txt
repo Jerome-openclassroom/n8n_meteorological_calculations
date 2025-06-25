@@ -1,0 +1,1 @@
+Workflow 10 : ce fichier contient une explication des étapes de traitement météo dans n8n, y compris les calculs physiques en JavaScript pour LCL, θe et le rapport de mélange.
